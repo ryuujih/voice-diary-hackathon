@@ -1,0 +1,1737 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="api-base-url" content="https://your-api-domain.com/api">
+    <title>対話型音声日記帳</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+     
+        body {
+            font-family: 'Hiragino Sans', 'Yu Gothic', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+     
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+     
+        .header {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 30px;
+            color: white;
+        }
+     
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+     
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            margin-bottom: 15px;
+        }
+     
+        .user-info {
+            position: static; /* absoluteから変更 */
+            background: rgba(255, 255, 255, 0.2);
+            padding: 10px 20px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px; /* タイトルとのスペース */
+        }
+     
+        .user-email {
+            color: white;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+     
+        .mode-indicator {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+     
+        .mode-indicator span {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            backdrop-filter: blur(10px);
+        }
+     
+        .chat-section {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            backdrop-filter: blur(15px);
+        }
+     
+        .chat-info {
+            background: linear-gradient(135deg, #e3f2fd, #f3e5f5);
+            color: #1565c0;
+            padding: 15px 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            font-size: 0.95rem;
+            border-left: 4px solid #2196f3;
+        }
+     
+        .chat-messages {
+            height: 400px;
+            overflow-y: auto;
+            border: 2px solid #e9ecef;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            background: #f8f9fa;
+            scroll-behavior: smooth;
+        }
+     
+        .message {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 12px;
+            animation: fadeInUp 0.3s ease;
+        }
+     
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+     
+        .message.user {
+            justify-content: flex-end;
+        }
+     
+        .message.user .message-content {
+            background: linear-gradient(135deg, #4c6ef5, #364fc7);
+            color: white;
+            border-radius: 20px 20px 5px 20px;
+            box-shadow: 0 3px 12px rgba(76, 111, 245, 0.3);
+        }
+     
+        .message.ai {
+            justify-content: flex-start;
+        }
+     
+        .message.ai .message-content {
+            background: white;
+            color: #333;
+            border: 2px solid #e9ecef;
+            border-radius: 20px 20px 20px 5px;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.05);
+        }
+     
+        .message-content {
+            max-width: 75%;
+            padding: 15px 20px;
+            line-height: 1.5;
+            font-size: 0.95rem;
+        }
+     
+        .message-time {
+            font-size: 0.75rem;
+            opacity: 0.7;
+            margin-top: 8px;
+        }
+     
+        .typing-indicator {
+            display: none;
+            justify-content: flex-start;
+            margin-bottom: 20px;
+        }
+     
+        .typing-indicator .message-content {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 20px 20px 20px 5px;
+            padding: 15px 20px;
+            max-width: 200px;
+        }
+     
+        .typing-dots {
+            display: flex;
+            gap: 4px;
+        }
+     
+        .typing-dots span {
+            width: 8px;
+            height: 8px;
+            background: #666;
+            border-radius: 50%;
+            animation: typing 1.4s infinite;
+        }
+     
+        .typing-dots span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+     
+        .typing-dots span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+     
+        @keyframes typing {
+            0%, 60%, 100% {
+                transform: translateY(0);
+                opacity: 0.4;
+            }
+            30% {
+                transform: translateY(-10px);
+                opacity: 1;
+            }
+        }
+     
+        .chat-input-area {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            background: white;
+            padding: 15px;
+            border-radius: 25px;
+            box-shadow: 0 3px 15px rgba(0,0,0,0.1);
+        }
+     
+        .voice-btn {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+            color: white;
+            border: none;
+            padding: 12px 16px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 3px 12px rgba(255, 107, 107, 0.3);
+            font-size: 1.2rem;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+        }
+     
+        .voice-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(255, 107, 107, 0.4);
+        }
+     
+        .voice-btn.recording {
+            background: linear-gradient(135deg, #51cf66, #40c057);
+            animation: pulse 1.5s infinite;
+        }
+     
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+     
+        .chat-input {
+            flex: 1;
+            padding: 12px 20px;
+            border: 2px solid transparent;
+            border-radius: 25px;
+            font-size: 1rem;
+            background: #f8f9fa;
+            transition: all 0.3s ease;
+        }
+     
+        .chat-input:focus {
+            outline: none;
+            border-color: #4c6ef5;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(76, 111, 245, 0.1);
+        }
+     
+        .send-btn {
+            background: linear-gradient(135deg, #4c6ef5, #364fc7);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            box-shadow: 0 3px 12px rgba(76, 111, 245, 0.3);
+        }
+     
+        .send-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(76, 111, 245, 0.4);
+        }
+     
+        .send-btn:disabled {
+            background: #dee2e6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+     
+        .summarize-section {
+            text-align: center;
+            margin-top: 25px;
+            padding: 20px;
+            background: linear-gradient(135deg, #fff9c4, #ffeaa7);
+            border-radius: 15px;
+            border: 2px solid #fdcb6e;
+            display: none;
+        }
+     
+        .summarize-section h3 {
+            color: #d63031;
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+        }
+     
+        .summarize-section p {
+            color: #74b9ff;
+            margin-bottom: 15px;
+            font-size: 0.95rem;
+        }
+     
+        .summarize-btn {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+        }
+     
+        .summarize-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 25px rgba(40, 167, 69, 0.4);
+        }
+     
+        .summarize-btn:disabled {
+            background: #dee2e6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .dialog-list-section {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            backdrop-filter: blur(15px);
+        }
+        .dialog-list-section h2 {
+            color: #495057;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .dialog-item {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px 20px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            min-height: 80px;
+        }
+        .dialog-item:hover {
+            background: #f8f9fa;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .dialog-date {
+            font-weight: 500;
+            color: #495057;
+            min-width: 140px;
+            font-size: 0.9rem;
+        }
+        .dialog-title {
+            font-weight: 600;
+            color: #2c3e50;
+            min-width: 150px;
+            font-size: 1rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .dialog-preview {
+            color: #6c757d;
+            font-size: 0.9rem;
+            flex: 1;
+            line-height: 1.4;
+            padding-right: 20px;
+        }
+        .dialog-detail {
+            background: #e8f4f8;
+            border: 2px solid #17a2b8;
+            border-radius: 12px;
+            padding: 25px;
+            margin-top: 15px;
+            display: none;
+            max-width: none;
+        }
+        .dialog-detail h3 {
+            color: #0c5460;
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+        }
+        .dialog-content {
+            line-height: 1.8;
+            color: #495057;
+            white-space: pre-wrap;
+            font-size: 1rem;
+            text-align: left;
+            writing-mode: horizontal-tb;
+        }
+     
+        .diary-section {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            backdrop-filter: blur(15px);
+        }
+     
+        .diary-section h2 {
+            color: #495057;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+     
+        .diary-entry {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+            position: relative;
+        }
+     
+        .diary-entry:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+        }
+     
+        .diary-date {
+            color: #6c757d;
+            font-size: 0.9rem;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+     
+        .diary-type {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+     
+        .conversation-info {
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+        }
+     
+        .diary-content {
+            line-height: 1.7;
+            color: #343a40;
+            font-size: 1rem;
+        }
+     
+        .delete-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: none;
+            border: none;
+            color: #dc3545;
+            font-size: 1.2rem;
+            cursor: pointer;
+            opacity: 0.6;
+            transition: opacity 0.3s ease;
+        }
+     
+        .delete-btn:hover {
+            opacity: 1;
+        }
+     
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #4c6ef5;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+        }
+     
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+     
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+            border: 1px solid #f5c6cb;
+            border-left: 4px solid #dc3545;
+        }
+     
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+            border: 1px solid #c3e6cb;
+            border-left: 4px solid #28a745;
+        }
+     
+        .status-display {
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 0.95rem;
+            color: #6c757d;
+        }
+     
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #6c757d;
+        }
+     
+        .empty-state h3 {
+            margin-bottom: 15px;
+            color: #495057;
+        }
+     
+        .empty-state p {
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+     
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+         
+            .header h1 {
+                font-size: 2rem;
+            }
+         
+            .user-info {
+                position: static;
+                margin: 15px auto 0;
+                max-width: 300px;
+            }
+         
+            .chat-section, .diary-section, .dialog-list-section {
+                padding: 20px;
+            }
+         
+            .chat-messages {
+                height: 300px;
+            }
+         
+            .message-content {
+                max-width: 85%;
+                padding: 12px 16px;
+            }
+         
+            .chat-input-area {
+                flex-direction: column;
+                gap: 10px;
+            }
+         
+            .chat-input {
+                width: 100%;
+            }
+         
+            .voice-btn {
+                width: 60px;
+                height: 60px;
+                font-size: 1.4rem;
+            }
+            .dialog-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+                min-height: auto;
+            }
+            .dialog-date, .dialog-title {
+                min-width: auto;
+            }
+            .dialog-preview {
+                max-width: none;
+                padding-right: 0;
+            }
+        }
+        .dialog-delete-btn:hover {
+            background: #c82333 !important;
+            transform: scale(1.1);
+        }
+        /* 修正: ユーザ入力部分のレイアウト調整 */
+        #user-input-section {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        #user-input-section label {
+            color: white;
+            font-size: 0.9rem;
+        }
+        #user-input-section input {
+            padding: 5px 10px;
+            border-radius: 5px;
+            border: none;
+        }
+        #user-input-section button {
+            background: rgba(220, 53, 69, 0.8);
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.3s ease;
+        }
+        #user-input-section button:hover {
+            background: rgba(220, 53, 69, 1);
+            transform: scale(1.05);
+        }
+        /* ヘッダーの調整で重なりを防ぐ */
+        .header {
+            padding-top: 40px; /* ユーザ入力部分の高さ分スペースを追加 */
+        }
+        .user-info {
+            top: 10px; /* 少し下に調整 */
+        }
+    </style>
+    <script type="module">
+        import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+        import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+        const firebaseConfig = {
+        apiKey: "実際のAPIキー",
+        authDomain: "実際のauthDomain",
+        projectId: "実際のprojectID",
+        storageBucket: "実際のstorageBucket",
+        messagingSenderId: "実際のmessagingSenderId",
+        appId: "実際のappId"
+        };
+        let app, db;
+        try {
+            app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+            db = getFirestore(app, 'voice-diary-db');
+            console.log('Firebase初期化完了');
+        } catch (error) {
+            console.error('Firebase初期化エラー:', error);
+        }
+        const formatDate = (date = new Date()) => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hour = String(date.getHours()).padStart(2, '0');
+            const minute = String(date.getMinutes()).padStart(2, '0');
+            return `${year}${month}${day}${hour}${minute}`;
+        };
+        function encodeUsername(username) {
+            // 変更: 日本語対応のため、base64エンコードに変更 (Firestoreコレクション名制限対応)
+            return btoa(unescape(encodeURIComponent(username))).replace(/=/g, '_');
+        }
+        async function saveDialogToFirestore(username, diaryContent, title) {
+            if (!db || !username) return null;
+            try {
+                const dateString = formatDate();
+                const docId = `dialog_${dateString}`;
+                const collectionName = encodeUsername(username);
+                const payload = {
+                    type: 'dialog',
+                    date: dateString,
+                    title: title || 'タイトルなし',
+                    text: diaryContent
+                };
+                const docRef = doc(db, collectionName, docId);
+                await setDoc(docRef, payload);
+                console.log('ダイアログ保存成功:', docId);
+                return docId;
+            } catch (error) {
+                console.error('ダイアログ保存エラー:', error);
+                return null;
+            }
+        }
+        async function saveChatToFirestore(username, messages) {
+            if (!db || !username) return null;
+            try {
+                const dateString = formatDate();
+                const docId = `chat_${dateString}`;
+                const collectionName = encodeUsername(username);
+                const chatText = messages.map(msg => {
+                    const role = msg.role === 'user' ? username : 'AI';
+                    return `${role}: ${msg.content}`;
+                }).join('\n');
+                const payload = {
+                    type: 'chat',
+                    date: dateString,
+                    text: chatText
+                };
+                const docRef = doc(db, collectionName, docId);
+                await setDoc(docRef, payload);
+                console.log('チャット保存成功:', docId);
+                return docId;
+            } catch (error) {
+                console.error('チャット保存エラー:', error);
+                return null;
+            }
+        }
+        async function getDialogListFromFirestore(username) {
+            if (!db || !username) return [];
+            try {
+                const collectionName = encodeUsername(username);
+                console.log('ダイアログ一覧取得開始:', username, '->', collectionName);
+                const colRef = collection(db, collectionName);
+                const querySnapshot = await getDocs(colRef);
+                console.log('取得したドキュメント数:', querySnapshot.size);
+                const dialogs = [];
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    console.log('ドキュメントデータ:', doc.id, data);
+                    if (data.type === 'dialog') {
+                        console.log('Dialog発見:', {
+                            id: doc.id,
+                            title: data.title,
+                            hasTitle: !!data.title,
+                            textPreview: data.text ? data.text.substring(0, 50) : 'なし'
+                        });
+                        dialogs.push({
+                            id: doc.id,
+                            date: data.date,
+                            title: data.title || null,
+                            text: data.text,
+                        });
+                    }
+                });
+                dialogs.sort((a, b) => {
+                    if (!a.date || !b.date) return 0;
+                    return b.date.localeCompare(a.date);
+                });
+                console.log('処理後のダイアログ一覧:', dialogs);
+                return dialogs;
+            } catch (error) {
+                console.error('ダイアログ一覧取得エラー:', error);
+                return [];
+            }
+        }
+        async function deleteDialogFromFirestore(username, dialogId) {
+            if (!db || !username || !dialogId) return false;
+            try {
+                console.log('ダイアログ削除:', username, dialogId);
+                const collectionName = encodeUsername(username);
+                console.log('削除対象コレクション:', collectionName);
+                const docRef = doc(db, collectionName, dialogId);
+                await deleteDoc(docRef);
+                console.log('ダイアログ削除成功:', dialogId);
+                return true;
+            } catch (error) {
+                console.error('ダイアログ削除エラー:', error);
+                return false;
+            }
+        }
+        window.FirestoreUtils = {
+            saveChatToFirestore,
+            saveDialogToFirestore,
+            getDialogListFromFirestore,
+            deleteDialogFromFirestore
+        };
+        window.generateTitleWithAI = async function(diaryContent, apiBaseUrl) {
+            try {
+                const response = await fetch(`${apiBaseUrl}/generate-title`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        content: diaryContent
+                    })
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success && data.title) {
+                        return data.title;
+                    }
+                }
+            } catch (error) {
+                console.warn('AIタイトル生成エラー:', error);
+            }
+            return generateSimpleTitle(diaryContent);
+        };
+        function generateSimpleTitle(diaryContent) {
+            if (!diaryContent) return 'タイトルなし';
+            let title = diaryContent.split('。')[0] || diaryContent.split('\n')[0] || diaryContent;
+            if (title.length > 30) {
+                title = title.substring(0, 27) + '...';
+            }
+            const keywords = ['楽しい', '嬉しい', '悲しい', '忙しい', '平和', '特別', '普通', '新しい'];
+            const foundKeyword = keywords.find(keyword => title.includes(keyword));
+            if (foundKeyword) {
+                return `${foundKeyword}一日の記録`;
+            }
+            const now = new Date();
+            const month = now.getMonth() + 1;
+            const day = now.getDate();
+            return `${month}月${day}日の日記`;
+        }
+    </script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="user-info">
+                <div id="user-input-section">
+                    <label for="username">ユーザ名を入力してください：</label>
+                    <input type="text" id="username" placeholder="あなたの名前" required>
+                    <button id="set-username">設定</button>
+                    <span class="user-email" id="user-email">ユーザ名未設定</span>
+                </div>
+            </div>
+            <h1>💬 対話型音声日記帳</h1>
+            <p>AIとの対話を通じて、心に残る美しい日記を作成しましょう</p>
+        </div>
+     
+        <div class="mode-indicator">
+            <span id="modeIndicator">📄 接続確認中...</span>
+        </div>
+     
+        <div class="chat-section">
+            <div class="chat-info">
+                <strong>💡 使い方:</strong>マイクボタンを長押しして録音、またはテキストで今日の出来事を話してください。AIが短い質問で詳細を聞き出し、最後に美しい日記を作成します。<br>
+                <small>💬 自然な対話を楽しんだ後、「日記にまとめる」ボタンで日記作成できます</small>
+            </div>
+         
+            <div id="chatMessages" class="chat-messages">
+                <div class="message ai">
+                    <div class="message-content">
+                        こんにちは！今日はどんなことがありましたか？😊
+                        <div class="message-time" id="initialTime"></div>
+                    </div>
+                </div>
+            </div>
+         
+            <div id="typingIndicator" class="typing-indicator">
+                <div class="message-content">
+                    <div class="typing-dots">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                </div>
+            </div>
+         
+            <div class="status-display" id="statusDisplay">
+                🎤 マイクボタンを長押しして録音してください
+            </div>
+         
+            <div class="chat-input-area">
+                <button id="voiceBtn" class="voice-btn" title="長押しで録音">🎤</button>
+                <input type="text" id="chatInput" class="chat-input" placeholder="今日はどんなことがありましたか？" />
+                <button id="sendBtn" class="send-btn">送信</button>
+            </div>
+         
+            <div id="summarizeSection" class="summarize-section">
+                <h3>📝 対話完了！</h3>
+                <p>お話を聞かせていただき、ありがとうございました。これまでの対話内容をまとめて美しい日記を作成いたします。</p>
+                <button id="summarizeBtn" class="summarize-btn">✨ 対話内容を日記にまとめる</button>
+            </div>
+        </div>
+        <div class="dialog-list-section">
+            <h2>📚 保存された日記一覧</h2>
+            <div id="dialogList"></div>
+        </div>
+     
+        <div class="diary-section">
+            <h2>📖 作成された日記</h2>
+            <div id="diaryEntries"></div>
+        </div>
+    </div>
+    <script>
+        window.API_CONFIG = {
+            baseUrl: document.querySelector('meta[name="api-base-url"]')?.content || '/api',
+            fallbackUrls: [
+                '/api',
+                'https://voice-diary-prod-1017220795872.asia-northeast1.run.app/api',
+            ]
+        };
+        class ChatDiary {
+            constructor() {
+                this.isRecording = false;
+                this.mediaRecorder = null;
+                this.audioChunks = [];
+                this.currentChatSession = null;
+                this.diaryEntries = JSON.parse(localStorage.getItem('diaryEntries') || '[]');
+                this.isGCPMode = false;
+                this.apiBaseUrl = window.API_CONFIG.baseUrl;
+                this.currentApiIndex = 0;
+                this.currentChatMessages = [];
+                this.currentUserId = null;
+                this.currentUser = { username: localStorage.getItem('username') || null };
+             
+                this.modeIndicator = document.getElementById('modeIndicator');
+                this.chatMessages = document.getElementById('chatMessages');
+                this.typingIndicator = document.getElementById('typingIndicator');
+                this.statusDisplay = document.getElementById('statusDisplay');
+                this.voiceBtn = document.getElementById('voiceBtn');
+                this.chatInput = document.getElementById('chatInput');
+                this.sendBtn = document.getElementById('sendBtn');
+                this.summarizeSection = document.getElementById('summarizeSection');
+                this.summarizeBtn = document.getElementById('summarizeBtn');
+                this.diaryEntries_el = document.getElementById('diaryEntries');
+                this.dialogList = document.getElementById('dialogList');
+             
+                this.initEventListeners();
+                this.initializeAPI();
+                this.displayDiaryEntries();
+             
+                document.getElementById('initialTime').textContent = this.formatTime(new Date());
+                if (this.currentUser.username) {
+                    document.getElementById('user-email').textContent = this.currentUser.username;
+                    this.setCurrentUser(this.currentUser.username);
+                    this.loadDialogList();
+                }
+            }
+            setCurrentUser(username) {
+                this.currentUserId = username;
+                this.currentUser.username = username;
+                localStorage.setItem('username', username);
+                document.getElementById('user-email').textContent = username;
+                console.log('現在のユーザー名設定:', username);
+                this.loadDialogList();
+            }
+         
+            async initializeAPI() {
+                for (let i = 0; i < window.API_CONFIG.fallbackUrls.length; i++) {
+                    try {
+                        const testUrl = window.API_CONFIG.fallbackUrls[i];
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 5000);
+                     
+                        const response = await fetch(`${testUrl}/health`, {
+                            method: 'GET',
+                            signal: controller.signal
+                        });
+                        clearTimeout(timeoutId);
+                     
+                        if (response.ok) {
+                            this.apiBaseUrl = testUrl;
+                            this.currentApiIndex = i;
+                            console.log(`API接続成功: ${testUrl}`);
+                            await this.checkHealthStatus();
+                            await this.startChatSession();
+                            return;
+                        }
+                    } catch (error) {
+                        console.warn(`API接続失敗: ${window.API_CONFIG.fallbackUrls[i]}`, error.message);
+                    }
+                }
+              
+                this.modeIndicator.innerHTML = '❌ API接続エラー - すべてのエンドポイントが利用できません';
+                this.showError('APIサーバーに接続できません。しばらく待ってからページを再読み込みしてください。');
+            }
+         
+            async tryApiCall(endpoint, options = {}) {
+                let lastError;
+             
+                for (let attempt = 0; attempt < window.API_CONFIG.fallbackUrls.length; attempt++) {
+                    const currentUrl = window.API_CONFIG.fallbackUrls[(this.currentApiIndex + attempt) % window.API_CONFIG.fallbackUrls.length];
+                 
+                    try {
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 30000);
+                     
+                        try {
+                            const response = await fetch(`${currentUrl}${endpoint}`, {
+                                signal: controller.signal,
+                                ...options
+                            });
+                            clearTimeout(timeoutId);
+                         
+                            if (response.ok) {
+                                this.apiBaseUrl = currentUrl;
+                                this.currentApiIndex = (this.currentApiIndex + attempt) % window.API_CONFIG.fallbackUrls.length;
+                                return response;
+                            } else {
+                                throw new Error(`HTTP ${response.status}`);
+                            }
+                        } catch (fetchError) {
+                            clearTimeout(timeoutId);
+                            throw fetchError;
+                        }
+                    } catch (error) {
+                        lastError = error;
+                        console.warn(`API呼び出し失敗: ${currentUrl}${endpoint}`, error.message);
+                    }
+                }
+              
+                throw new Error(`すべてのAPIエンドポイントで失敗: ${lastError?.message}`);
+            }
+         
+            async checkHealthStatus() {
+                try {
+                    const response = await fetch(`${this.apiBaseUrl}/health`);
+                    const data = await response.json();
+                    this.isGCPMode = data.gcpConfigured;
+                 
+                    this.modeIndicator.innerHTML = this.isGCPMode
+                        ? '🚀 GCP API接続中 - 高品質音声認識'
+                        : '🎭 デモモード - 体験版';
+                     
+                    console.log('System status:', data);
+                } catch (error) {
+                    console.error('Health check failed:', error);
+                    this.modeIndicator.innerHTML = '❌ API接続エラー';
+                    try {
+                        const response = await this.tryApiCall('/health');
+                        const data = await response.json();
+                        this.isGCPMode = data.gcpConfigured;
+                        this.modeIndicator.innerHTML = this.isGCPMode
+                            ? '🚀 GCP API接続中 - 高品質音声認識'
+                            : '🎭 デモモード - 体験版';
+                    } catch (fallbackError) {
+                        console.error('All health check attempts failed:', fallbackError);
+                    }
+                }
+            }
+         
+            initEventListeners() {
+                document.getElementById('set-username').addEventListener('click', () => {
+                    const username = document.getElementById('username').value.trim();
+                    if (username) {
+                        this.setCurrentUser(username);
+                    } else {
+                        alert('ユーザ名を入力してください。');
+                    }
+                });
+                this.voiceBtn.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    this.startRecording();
+                });
+             
+                this.voiceBtn.addEventListener('mouseup', (e) => {
+                    e.preventDefault();
+                    if (this.isRecording) {
+                        this.stopRecording();
+                    }
+                });
+             
+                this.voiceBtn.addEventListener('mouseleave', (e) => {
+                    if (this.isRecording) {
+                        this.stopRecording();
+                    }
+                });
+             
+                this.voiceBtn.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    this.startRecording();
+                });
+             
+                this.voiceBtn.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    if (this.isRecording) {
+                        this.stopRecording();
+                    }
+                });
+             
+                this.voiceBtn.addEventListener('touchcancel', (e) => {
+                    e.preventDefault();
+                    if (this.isRecording) {
+                        this.stopRecording();
+                    }
+                });
+             
+                this.sendBtn.addEventListener('click', () => this.sendMessage());
+                this.chatInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        this.sendMessage();
+                    }
+                });
+                this.summarizeBtn.addEventListener('click', () => this.summarizeChat());
+            }
+         
+            async startChatSession() {
+                try {
+                    const response = await fetch(`${this.apiBaseUrl}/chat/start`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                 
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                 
+                    const data = await response.json();
+                    if (data.success) {
+                        this.currentChatSession = data.sessionId;
+                        this.currentChatMessages = [];
+                        console.log('チャットセッション開始:', this.currentChatSession);
+                    }
+                } catch (error) {
+                    console.error('チャットセッション開始エラー:', error);
+                    try {
+                        const response = await this.tryApiCall('/chat/start', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' }
+                        });
+                        const data = await response.json();
+                        if (data.success) {
+                            this.currentChatSession = data.sessionId;
+                            this.currentChatMessages = [];
+                            console.log('チャットセッション開始（フォールバック）:', this.currentChatSession);
+                        }
+                    } catch (fallbackError) {
+                        this.showError('チャットセッションの開始に失敗しました');
+                    }
+                }
+            }
+         
+            async startRecording() {
+                if (this.isRecording) return;
+             
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            echoCancellation: true,
+                            noiseSuppression: true,
+                            autoGainControl: true,
+                            sampleRate: 48000,
+                            channelCount: 1
+                        }
+                    });
+                 
+                    const options = {
+                        mimeType: 'audio/webm;codecs=opus',
+                        audioBitsPerSecond: 64000
+                    };
+                 
+                    this.mediaRecorder = new MediaRecorder(stream, options);
+                    this.audioChunks = [];
+                 
+                    this.recordingTimeout = setTimeout(() => {
+                        if (this.isRecording) {
+                            this.stopRecording();
+                            this.showWarning('録音時間が60秒に達しました');
+                        }
+                    }, 60000);
+                 
+                    this.mediaRecorder.ondataavailable = (event) => {
+                        if (event.data.size > 0) {
+                            this.audioChunks.push(event.data);
+                        }
+                    };
+                 
+                    this.mediaRecorder.onstop = () => {
+                        clearTimeout(this.recordingTimeout);
+                        this.processAudio();
+                    };
+                 
+                    this.mediaRecorder.start(1000);
+                    this.isRecording = true;
+                 
+                    this.voiceBtn.textContent = '🎙️';
+                    this.voiceBtn.classList.add('recording');
+                    this.statusDisplay.textContent = '🎤 録音中... ボタンを離すと録音終了します';
+                 
+                } catch (error) {
+                    this.showError('マイクへのアクセスが拒否されました: ' + error.message);
+                    console.error('Recording error:', error);
+                }
+            }
+         
+            stopRecording() {
+                if (this.mediaRecorder && this.isRecording) {
+                    this.mediaRecorder.stop();
+                    this.mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                    this.isRecording = false;
+                 
+                    this.voiceBtn.textContent = '🎤';
+                    this.voiceBtn.classList.remove('recording');
+                    this.statusDisplay.textContent = '📄 音声を処理中...';
+                }
+            }
+         
+            async processAudio() {
+                try {
+                    if (this.audioChunks.length === 0) {
+                        throw new Error('録音データがありません');
+                    }
+                    const audioBlob = new Blob(this.audioChunks, {
+                        type: this.mediaRecorder.mimeType || 'audio/webm'
+                    });
+                 
+                    console.log('Audio processing:', audioBlob.size, 'bytes');
+                 
+                    if (audioBlob.size < 1000) {
+                        throw new Error('録音時間が短すぎます');
+                    }
+                 
+                    const formData = new FormData();
+                    formData.append('audio', audioBlob, 'recording.webm');
+                 
+                    const response = await fetch(`${this.apiBaseUrl}/speech-to-text`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                 
+                    if (!response.ok) {
+                        throw new Error(`音声認識APIエラー: ${response.status}`);
+                    }
+                 
+                    const data = await response.json();
+                    if (!data.success) {
+                        throw new Error(data.error || '音声認識に失敗しました');
+                    }
+                 
+                    await this.sendMessage(data.transcript);
+                 
+                    const modeText = data.mode === 'demo' ? '（デモ）' : '（GCP）';
+                    this.statusDisplay.textContent = `✅ 音声認識完了${modeText} - AIが日記を作成中...`;
+                 
+                } catch (error) {
+                    this.showError('音声処理中にエラー: ' + error.message);
+                    this.statusDisplay.textContent = '❌ 音声処理に失敗しました';
+                    console.error('Audio processing error:', error);
+                }
+            }
+         
+            async sendMessage(messageText = null) {
+                const text = messageText || this.chatInput.value.trim();
+                if (!text || !this.currentChatSession) return;
+             
+                try {
+                    this.currentChatMessages.push({
+                        role: 'user',
+                        content: text,
+                        timestamp: new Date()
+                    });
+                    this.addMessage('user', text);
+                    this.chatInput.value = '';
+                 
+                    this.sendBtn.disabled = true;
+                    this.voiceBtn.disabled = true;
+                 
+                    this.showTypingIndicator();
+                 
+                    const response = await fetch(`${this.apiBaseUrl}/chat/message`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            sessionId: this.currentChatSession,
+                            message: text
+                        })
+                    });
+                 
+                    if (!response.ok) {
+                        throw new Error(`チャットAPIエラー: ${response.status}`);
+                    }
+                 
+                    const data = await response.json();
+                 
+                    this.hideTypingIndicator();
+                 
+                    if (data.success) {
+                        this.currentChatMessages.push({
+                            role: 'assistant',
+                            content: data.response,
+                            timestamp: new Date()
+                        });
+                        this.addMessage('ai', data.response);
+                     
+                        if (data.canSummarize) {
+                            this.summarizeSection.style.display = 'block';
+                            this.statusDisplay.textContent = '📝 十分な対話ができました！日記にまとめることができます';
+                        } else {
+                            this.statusDisplay.textContent = '💬 続けて対話してください';
+                        }
+                        if (this.currentUser.username) {
+                            await window.FirestoreUtils.saveChatToFirestore(this.currentUser.username, this.currentChatMessages);
+                        }
+                    } else {
+                        throw new Error(data.error || 'チャット処理に失敗しました');
+                    }
+                 
+                } catch (error) {
+                    this.hideTypingIndicator();
+                    console.error('メッセージ送信エラー:', error);
+                 
+                    try {
+                        const response = await this.tryApiCall('/chat/message', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                sessionId: this.currentChatSession,
+                                message: text
+                            })
+                        });
+                     
+                        const data = await response.json();
+                        if (data.success) {
+                            this.currentChatMessages.push({
+                                role: 'assistant',
+                                content: data.response,
+                                timestamp: new Date()
+                            });
+                            this.addMessage('ai', data.response);
+                            if (data.canSummarize) {
+                                this.summarizeSection.style.display = 'block';
+                                this.statusDisplay.textContent = '📝 十分な対話ができました！日記にまとめることができます';
+                            } else {
+                                this.statusDisplay.textContent = '💬 続けて対話してください';
+                            }
+                            if (this.currentUser.username) {
+                                await window.FirestoreUtils.saveChatToFirestore(this.currentUser.username, this.currentChatMessages);
+                            }
+                        } else {
+                            throw new Error(data.error);
+                        }
+                    } catch (fallbackError) {
+                        this.addMessage('ai', '申し訳ありません。エラーが発生しました。もう一度お試しください。');
+                        this.statusDisplay.textContent = '❌ エラーが発生しました';
+                    }
+                } finally {
+                    this.sendBtn.disabled = false;
+                    this.voiceBtn.disabled = false;
+                }
+            }
+         
+            async summarizeChat() {
+                if (!this.currentChatSession) return;
+             
+                try {
+                    this.summarizeBtn.disabled = true;
+                    this.summarizeBtn.innerHTML = '📝 美しい日記を作成中... <span class="loading"></span>';
+                    this.statusDisplay.textContent = '✨ AIが対話内容をまとめています...';
+                 
+                    const response = await fetch(`${this.apiBaseUrl}/chat/summarize`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            sessionId: this.currentChatSession
+                        })
+                    });
+                 
+                    if (!response.ok) {
+                        throw new Error(`要約APIエラー: ${response.status}`);
+                    }
+                 
+                    const data = await response.json();
+                    if (data.success) {
+                        const title = await window.generateTitleWithAI(data.diary, this.apiBaseUrl);
+                        console.log('生成されたタイトル:', title);
+                        if (this.currentUser.username) {
+                            await window.FirestoreUtils.saveDialogToFirestore(this.currentUser.username, data.diary, title);
+                        }
+                        const diaryEntry = {
+                            id: Date.now(),
+                            date: new Date().toLocaleString('ja-JP'),
+                            originalText: `対話型日記 (${data.conversationCount}回の対話, ${data.duration}分)`,
+                            diaryContent: data.diary,
+                            diaryTitle: title,
+                            mode: data.mode || 'chat',
+                            type: 'chat',
+                            conversationCount: data.conversationCount,
+                            duration: data.duration
+                        };
+                     
+                        this.diaryEntries.unshift(diaryEntry);
+                        localStorage.setItem('diaryEntries', JSON.stringify(this.diaryEntries));
+                     
+                        this.displayDiaryEntries();
+                        this.showSuccess(`素敵な対話型日記「${title}」が完成しました！ (${data.conversationCount}回の対話, ${data.duration}分)`);
+                     
+                        await this.loadDialogList();
+                     
+                        this.resetChat();
+                     
+                    } else {
+                        throw new Error(data.error || '日記の要約に失敗しました');
+                    }
+                 
+                } catch (error) {
+                    console.error('チャット要約エラー:', error);
+                 
+                    try {
+                        const response = await this.tryApiCall('/chat/summarize', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                sessionId: this.currentChatSession
+                            })
+                        });
+                     
+                        const data = await response.json();
+                        if (data.success) {
+                            const title = await window.generateTitleWithAI(data.diary, this.apiBaseUrl);
+                         
+                            if (this.currentUser.username) {
+                                await window.FirestoreUtils.saveDialogToFirestore(this.currentUser.username, data.diary, title);
+                            }
+                            const diaryEntry = {
+                                id: Date.now(),
+                                date: new Date().toLocaleString('ja-JP'),
+                                originalText: `対話型日記 (${data.conversationCount}回の対話, ${data.duration}分)`,
+                                diaryContent: data.diary,
+                                diaryTitle: title,
+                                mode: data.mode || 'chat',
+                                type: 'chat',
+                                conversationCount: data.conversationCount,
+                                duration: data.duration
+                            };
+                         
+                            this.diaryEntries.unshift(diaryEntry);
+                            localStorage.setItem('diaryEntries', JSON.stringify(this.diaryEntries));
+                            this.displayDiaryEntries();
+                            this.showSuccess(`素敵な対話型日記「${title}」が完成しました！`);
+                            await this.loadDialogList();
+                            this.resetChat();
+                        } else {
+                            throw new Error(data.error);
+                        }
+                    } catch (fallbackError) {
+                        this.showError('対話内容のまとめ中にエラーが発生しました: ' + fallbackError.message);
+                    }
+                } finally {
+                    this.summarizeBtn.disabled = false;
+                    this.summarizeBtn.innerHTML = '✨ 対話内容を日記にまとめる';
+                }
+            }
+            async loadDialogList() {
+                if (!this.currentUserId || !this.currentUser.username) {
+                    this.dialogList.innerHTML = '<p style="text-align:center; color:#6c757d;">ユーザ名を設定してください</p>';
+                    return;
+                }
+                console.log('loadDialogList called with username:', this.currentUser.username);
+                this.dialogList.innerHTML = '<p style="text-align:center; color:#6c757d;">データを読み込み中...</p>';
+                try {
+                    const dialogs = await window.FirestoreUtils.getDialogListFromFirestore(this.currentUser.username);
+                    console.log('取得したダイアログ:', dialogs);
+                 
+                    if (dialogs.length === 0) {
+                        this.dialogList.innerHTML = '<p style="text-align:center; color:#6c757d;">まだ保存された日記がありません</p>';
+                        return;
+                    }
+                    this.dialogList.innerHTML = '';
+                 
+                    dialogs.forEach((dialog, index) => {
+                        const dialogDiv = document.createElement('div');
+                        dialogDiv.className = 'dialog-item';
+                     
+                        const date = dialog.date;
+                        let formattedDate;
+                     
+                        if (date && date.length >= 12) {
+                            const year = date.substring(0, 4);
+                            const month = date.substring(4, 6);
+                            const day = date.substring(6, 8);
+                            const hour = date.substring(8, 10);
+                            const minute = date.substring(10, 12);
+                            formattedDate = `${year}/${month}/${day} ${hour}:${minute}`;
+                        } else {
+                            formattedDate = date || '日付不明';
+                        }
+                     
+                        let title = dialog.title || '';
+                        if (!title && dialog.text) {
+                            const firstSentence = dialog.text.split('。')[0] || dialog.text.split('\n')[0] || dialog.text;
+                            if (firstSentence.length > 15) {
+                                title = firstSentence.substring(0, 12) + '...';
+                            } else {
+                                title = firstSentence || '無題';
+                            }
+                        } else if (!title) {
+                            title = '無題';
+                        }
+                     
+                        const escapeHtml = (text) => {
+                            const div = document.createElement('div');
+                            div.textContent = text;
+                            return div.innerHTML;
+                        };
+                     
+                        const escapedTitle = escapeHtml(title);
+                        const preview = dialog.text && dialog.text.length > 50
+                            ? escapeHtml(dialog.text.substring(0, 50) + '...')
+                            : escapeHtml(dialog.text || 'テキストなし');
+                        dialogDiv.innerHTML = `
+                            <div style="flex: 1; cursor: pointer;" class="dialog-content-area">
+                                <div class="dialog-date">${formattedDate}</div>
+                                <div class="dialog-title">${escapedTitle}</div>
+                                <div class="dialog-preview">${preview}</div>
+                            </div>
+                            <button class="dialog-delete-btn" onclick="chatDiary.deleteDialog('${dialog.id}', '${this.currentUser.username}')" title="削除" style="
+                                background: #dc3545;
+                                color: white;
+                                border: none;
+                                border-radius: 50%;
+                                width: 32px;
+                                height: 32px;
+                                cursor: pointer;
+                                font-size: 14px;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                margin-left: 10px;
+                                flex-shrink: 0;
+                                transition: all 0.2s ease;
+                            ">×</button>
+                        `;
+                        const contentArea = dialogDiv.querySelector('.dialog-content-area');
+                        contentArea.addEventListener('click', () => {
+                            this.toggleDialogDetail(dialogDiv, dialog);
+                        });
+                        this.dialogList.appendChild(dialogDiv);
+                    });
+                } catch (error) {
+                    console.error('ダイアログ一覧取得エラー:', error);
+                    this.dialogList.innerHTML = `
+                        <div style="text-align:center; color:#dc3545;">
+                            <p>ダイアログ一覧の取得に失敗しました</p>
+                            <small>エラー: ${error.message}</small>
+                            <br><button onclick="chatDiary.loadDialogList()" style="margin-top:10px; padding:8px 16px; background:#007bff; color:white; border:none; border-radius:4px; cursor:pointer;">再試行</button>
+                        </div>
+                    `;
+                }
+            }
+            async deleteDialog(dialogId, username) {
+                if (!dialogId || !username) {
+                    this.showError('削除に必要な情報が不足しています');
+                    return;
+                }
+                const confirmed = confirm('この日記を削除しますか？\n削除すると元に戻すことはできません。');
+             
+                if (!confirmed) {
+                    return;
+                }
+                try {
+                    console.log('ダイアログ削除開始:', dialogId, 'username:', username);
+                 
+                    const result = await window.FirestoreUtils.deleteDialogFromFirestore(username, dialogId);
+                 
+                    if (result) {
+                        this.showSuccess('日記を削除しました');
+                        await this.loadDialogList();
+                    } else {
+                        this.showError('日記の削除に失敗しました');
+                    }
+                 
+                } catch (error) {
+                    console.error('ダイアログ削除エラー:', error);
+                    this.showError('日記の削除中にエラーが発生しました: ' + error.message);
+                }
+            }
+            toggleDialogDetail(dialogDiv, dialog) {
+                const existingDetail = dialogDiv.querySelector('.dialog-detail');
+             
+                if (existingDetail) {
+                    existingDetail.remove();
+                    return;
+                }
+                const detailDiv = document.createElement('div');
+                detailDiv.className = 'dialog-detail';
+                detailDiv.innerHTML = `
+                    <h3>📖 ${dialog.title || 'タイトルなし'}</h3>
+                    <div class="dialog-content">${dialog.text}</div>
+                `;
+             
+                dialogDiv.appendChild(detailDiv);
+                detailDiv.style.display = 'block';
+             
+                setTimeout(() => {
+                    detailDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }, 100);
+            }
+         
+            showTypingIndicator() {
+                this.typingIndicator.style.display = 'flex';
+                this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+            }
+         
+            hideTypingIndicator() {
+                this.typingIndicator.style.display = 'none';
+            }
+         
+            addMessage(sender, content) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${sender}`;
+             
+                const time = this.formatTime(new Date());
+             
+                messageDiv.innerHTML = `
+                    <div class="message-content">
+                        ${content.replace(/\n/g, '<br>')}
+                        <div class="message-time">${time}</div>
+                    </div>
+                `;
+             
+                this.chatMessages.appendChild(messageDiv);
+                this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+            }
+         
+            formatTime(date) {
+                return date.toLocaleTimeString('ja-JP', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            }
+         
+            resetChat() {
+                this.chatMessages.innerHTML = `
+                    <div class="message ai">
+                        <div class="message-content">
+                            素晴らしい日記ができました！✨<br>
+                            また新しい対話を始めましょう。今度はどんなお話をお聞かせください？
+                            <div class="message-time">${this.formatTime(new Date())}</div>
+                        </div>
+                    </div>
+                `;
+             
+                this.summarizeSection.style.display = 'none';
+                this.statusDisplay.textContent = '🎤 マイクボタンを長押しして録音してください';
+                this.currentChatSession = null;
+                this.currentChatMessages = [];
+             
+                setTimeout(() => this.startChatSession(), 1000);
+            }
+         
+            displayDiaryEntries() {
+                this.diaryEntries_el.innerHTML = '';
+             
+                if (this.diaryEntries.length === 0) {
+                    this.diaryEntries_el.innerHTML = `
+                        <div class="empty-state">
+                            <h3>まだ日記がありません</h3>
+                            <p>AIとの対話を通じて、最初の日記を作成してみましょう！</p>
+                            <p>音声またはテキストで今日の出来事をお話しください。</p>
+                        </div>
+                    `;
+                    return;
+                }
+             
+                this.diaryEntries.forEach(entry => {
+                    const entryDiv = document.createElement('div');
+                    entryDiv.className = 'diary-entry';
+                 
+                    const typeInfo = entry.type === 'chat'
+                        ? `<span class="conversation-info">${entry.conversationCount}回の対話 ${entry.duration}分</span>`
+                        : '<span class="diary-type">対話型日記</span>';
+                 
+                    entryDiv.innerHTML = `
+                        <button class="delete-btn" onclick="chatDiary.removeDiary(${entry.id})" title="削除">×</button>
+                        <div class="diary-date">
+                            ${entry.date}
+                            ${typeInfo}
+                        </div>
+                        <div class="diary-content">${entry.diaryContent.replace(/\n/g, '<br>')}</div>
+                    `;
+                 
+                    this.diaryEntries_el.appendChild(entryDiv);
+                });
+            }
+         
+            removeDiary(id) {
+                if (confirm('この日記を削除しますか？')) {
+                    this.diaryEntries = this.diaryEntries.filter(entry => entry.id !== id);
+                    localStorage.setItem('diaryEntries', JSON.stringify(this.diaryEntries));
+                    this.displayDiaryEntries();
+                    this.showSuccess('日記を削除しました');
+                }
+            }
+         
+            showError(message) {
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error';
+                errorDiv.textContent = message;
+                this.chatMessages.appendChild(errorDiv);
+                setTimeout(() => errorDiv.remove(), 5000);
+                this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+            }
+         
+            showSuccess(message) {
+                const successDiv = document.createElement('div');
+                successDiv.className = 'success';
+                successDiv.textContent = message;
+                this.chatMessages.appendChild(successDiv);
+                setTimeout(() => successDiv.remove(), 5000);
+                this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+            }
+         
+            showWarning(message) {
+                const warningDiv = document.createElement('div');
+                warningDiv.className = 'error';
+                warningDiv.style.background = '#fff3cd';
+                warningDiv.style.color = '#856404';
+                warningDiv.style.borderColor = '#ffeaa7';
+                warningDiv.textContent = message;
+                this.chatMessages.appendChild(warningDiv);
+                setTimeout(() => warningDiv.remove(), 3000);
+                this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+            }
+        }
+     
+        let chatDiary;
+     
+        document.addEventListener('DOMContentLoaded', () => {
+            chatDiary = new ChatDiary();
+        });
+    </script>
+</body>
+</html>

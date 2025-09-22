@@ -1,0 +1,20 @@
+{
+  "name": "voice-diary-api",
+  "version": "1.0.0",
+  "description": "対話型音声日記帳 API",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@google-cloud/speech": "^6.6.0",
+    "@google-cloud/vertexai": "^1.4.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.18.2",
+    "multer": "^1.4.5-lts.1"
+  }
+}
