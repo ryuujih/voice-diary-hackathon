@@ -121,7 +121,7 @@ app.post('/api/chat/start', (req, res) => {
     });
 });
 
-// 音声認識（デモモード対応改善）
+// 音声認識
 app.post('/api/speech-to-text', upload.single('audio'), async (req, res) => {
     try {
         if (!req.file) {
@@ -178,7 +178,7 @@ app.post('/api/speech-to-text', upload.single('audio'), async (req, res) => {
             }
         }
         
-        // デモモード（改善版）
+        // デモモード
         console.log('デモモードで音声認識をシミュレート');
         fs.unlinkSync(req.file.path);
         
@@ -253,90 +253,13 @@ app.post('/api/chat/message', async (req, res) => {
             try {
                 const messageCount = session.messages.filter(msg => msg.role === 'user').length;
                 
-                let prompt;
+                // 感情分析とコンテキスト分析の追加
+                const emotionAnalysis = analyzeUserEmotion(message);
+                const conversationContext = getConversationContext(session.messages);
                 
-                // インタビュアー風の構造的な質問パターン
-                const questionType = ((messageCount - 1) % 3) + 1; // 1, 2, 3のループ
-                const cycleCount = Math.floor((messageCount - 1) / 3) + 1; // 何周目か
-                
-                if (messageCount === 1) {
-                    // 最初の質問：何があったかの確認
-                    prompt = `ユーザーが日記作成のために話しかけてきました。インタビュアーのように、まず今日何があったかを聞いてください。
+                let prompt = generateAdaptivePrompt(messageCount, message, emotionAnalysis, conversationContext, session);
 
-        ユーザーの発言: "${message}"
-
-        応答のルール：
-        - 50文字以内の短い応答
-        - 共感を示す
-        - 今日の出来事について具体的に聞く
-        - インタビュアーのような聞き上手な口調
-
-        応答:`;
-
-                } else if (questionType === 1) {
-                    // 詳細の深掘り
-                    prompt = `前回の話について詳細を深掘りしてください。インタビュアーのように具体的な状況や背景を聞き出してください。
-
-        これまでの会話:
-        ${session.messages.slice(-3).map(msg => `${msg.role}: ${msg.content}`).join('\n')}
-
-        応答のルール：
-        - 50文字以内の短い応答
-        - 前回の話の詳細や背景を聞く
-        - 「それはどんな感じでしたか」「具体的にはどのような」など
-        - インタビュアーらしい掘り下げ方
-
-        応答:`;
-
-                } else if (questionType === 2) {
-                    // 感情の確認
-                    prompt = `その出来事に対する感情や印象を聞いてください。インタビュアーのように相手の内面を引き出してください。
-
-        これまでの会話:
-        ${session.messages.slice(-3).map(msg => `${msg.role}: ${msg.content}`).join('\n')}
-
-        応答のルール：
-        - 50文字以内の短い応答
-        - その時の気持ちや感情を聞く
-        - 「どう感じましたか」「どんな気持ちでしたか」など
-        - 共感的なインタビュアー口調
-
-        応答:`;
-
-                } else { // questionType === 3
-                    // 他に何かあったかの確認（新しい話題）
-                    if (cycleCount >= 3) {
-                        // 3周目以降は日記作成を提案
-                        prompt = `十分な情報が集まりました。インタビューを締めくくり、日記作成を提案してください。
-
-        これまでの会話:
-        ${session.messages.slice(-7).map(msg => `${msg.role}: ${msg.content}`).join('\n')}
-
-        応答のルール：
-        - 60文字以内
-        - 話を聞けたことに感謝
-        - 日記作成の提案
-        - インタビュアーらしい締めくくり
-
-        応答:`;
-                    } else {
-                        // 他の話題を聞く
-                        prompt = `他にも何か話題がないか聞いてください。インタビュアーのように新しい情報を引き出してください。
-
-        これまでの会話:
-        ${session.messages.slice(-5).map(msg => `${msg.role}: ${msg.content}`).join('\n')}
-
-        応答のルール：
-        - 50文字以内の短い応答
-        - 他の出来事や話題を聞く
-        - 「他にも何かありましたか」「それ以外には」など
-        - インタビュアーらしい話題転換
-
-        応答:`;
-                    }
-                }
-
-                console.log(`インタビュー質問生成中... (メッセージ${messageCount}回目, パターン${questionType}, 周回${cycleCount})`);
+                console.log(`適応的質問生成中... (メッセージ${messageCount}回目, 感情: ${emotionAnalysis.type})`);
                 const result = await generativeModel.generateContent(prompt);
                 const response = await result.response;
                 const aiResponse = response.candidates[0].content.parts[0].text.trim();
@@ -355,8 +278,8 @@ app.post('/api/chat/message', async (req, res) => {
                     success: true,
                     response: aiResponse,
                     messageCount: session.messages.length,
-                    canSummarize: messageCount >= 1,
-                    mode: 'gcp'
+                    canSummarize: messageCount >= 3,
+                    mode: 'gcp_improved'
                 });
 
             } catch (apiError) {
@@ -366,15 +289,11 @@ app.post('/api/chat/message', async (req, res) => {
         } else {
             // デモモード（改善版）
             const messageCount = session.messages.filter(msg => msg.role === 'user').length;
-            const shortResponses = [
-                "それは素敵ですね！どんな気持ちでしたか？",
-                "いいですね。一番印象に残ったのは何ですか？",
-                "なるほど。他にも何かありましたか？",
-                "ありがとうございます。素敵なお話でした！日記を作成しましょうか？"
-            ];
+            const emotionAnalysis = analyzeUserEmotion(message);
             
-            const responseIndex = Math.min(messageCount - 1, shortResponses.length - 1);
-            const aiResponse = shortResponses[responseIndex];
+            const adaptiveResponses = generateDemoResponses(messageCount, emotionAnalysis);
+            const responseIndex = Math.min(messageCount - 1, adaptiveResponses.length - 1);
+            const aiResponse = adaptiveResponses[responseIndex];
             
             session.messages.push({
                 role: 'assistant',
@@ -386,8 +305,8 @@ app.post('/api/chat/message', async (req, res) => {
                 success: true,
                 response: aiResponse,
                 messageCount: session.messages.length,
-                canSummarize: messageCount >= 1,
-                mode: 'demo'
+                canSummarize: messageCount >= 3,
+                mode: 'demo_improved'
             });
         }
 
@@ -397,10 +316,10 @@ app.post('/api/chat/message', async (req, res) => {
         // デモモードフォールバック
         const messageCount = session?.messages?.filter(msg => msg.role === 'user').length || 1;
         const fallbackResponses = [
-            "申し訳ありません。今日はどんなことがありましたか？",
-            "そうですね。もう少し詳しく教えてください。",
-            "なるほど。他にも何かありましたか？",
-            "ありがとうございます。日記を作成しましょう！"
+            "今日はどんな一日でしたか？",
+            "その時はどんな気持ちでしたか？",
+            "他にも印象に残ったことはありますか？",
+            "お話を聞かせていただき、ありがとうございました。日記にまとめてみませんか？"
         ];
         
         const responseIndex = Math.min(messageCount - 1, fallbackResponses.length - 1);
@@ -409,13 +328,171 @@ app.post('/api/chat/message', async (req, res) => {
             success: true,
             response: fallbackResponses[responseIndex],
             messageCount: messageCount * 2,
-            canSummarize: messageCount >= 1,
-            mode: 'demo_fallback'
+            canSummarize: messageCount >= 3,
+            mode: 'demo_fallback_improved'
         });
     }
 });
 
-// タイトル生成エンドポイント（改善版）
+// 感情分析関数
+function analyzeUserEmotion(message) {
+    const emotionKeywords = {
+        positive: ['楽しい', '嬉しい', '良かった', '素晴らしい', '幸せ', '満足', '素敵', '最高'],
+        negative: ['辛い', '悲しい', '困った', 'イライラ', '疲れた', '大変', '辛かった', 'ストレス'],
+        neutral: ['普通', '特に', 'いつも通り', '普段通り', 'まあまあ']
+    };
+    
+    const lowerMessage = message.toLowerCase();
+    
+    for (const [emotion, keywords] of Object.entries(emotionKeywords)) {
+        if (keywords.some(keyword => lowerMessage.includes(keyword))) {
+            return { type: emotion, confidence: 0.8 };
+        }
+    }
+    
+    return { type: 'neutral', confidence: 0.5 };
+}
+
+// 会話コンテキスト分析
+function getConversationContext(messages) {
+    const recentMessages = messages.slice(-4);
+    const topics = [];
+    const emotions = [];
+    
+    recentMessages.forEach(msg => {
+        if (msg.role === 'user') {
+            topics.push(extractMainTopic(msg.content));
+            emotions.push(analyzeUserEmotion(msg.content));
+        }
+    });
+    
+    return { topics, emotions, flowState: 'continuing' };
+}
+
+// 簡単なトピック抽出
+function extractMainTopic(content) {
+    const topicKeywords = ['仕事', '家族', '友達', '勉強', '趣味', '買い物', '食事', '旅行', '運動', '映画'];
+    return topicKeywords.find(topic => content.includes(topic)) || 'general';
+}
+
+// 適応的プロンプト生成
+function generateAdaptivePrompt(messageCount, currentMessage, emotionAnalysis, context, session) {
+    const emotionResponse = {
+        positive: '喜びを共有し、その体験をより詳しく聞く',
+        negative: '共感と理解を示し、優しく寄り添う口調で',
+        neutral: '自然に関心を示し、相手が話しやすい雰囲気で'
+    };
+
+    const baseRules = `
+応答のルール：
+- 50文字以内の自然で親しみやすい口調
+- ${emotionResponse[emotionAnalysis.type]}
+- 相手のペースに合わせ、プレッシャーを与えない
+- 人間らしい温かみのある反応
+`;
+
+    if (messageCount === 1) {
+        return `
+ユーザーが「${currentMessage}」と話しかけてきました。
+現在の感情状態: ${emotionAnalysis.type}
+
+この状況に適した自然な反応を生成してください：
+${baseRules}
+- 相手の話した具体的な内容に反応する
+- 「今日は」という定型的な聞き方ではなく、相手の言葉を受けて自然に質問する
+- 親近感のある口調で
+
+応答:`;
+    }
+    
+    const questionType = ((messageCount - 1) % 3) + 1;
+    const previousMessage = session.messages.length >= 3 ? session.messages[session.messages.length - 3].content : '';
+    
+    if (questionType === 1) {
+        return `
+会話の流れ：
+前回: 「${previousMessage}」
+今回: 「${currentMessage}」
+感情: ${emotionAnalysis.type}
+
+この流れで自然に詳細を聞いてください：
+${baseRules}
+- 前の話との自然なつながりを意識
+- 「具体的には？」ではなく、興味深い部分を掘り下げる質問
+- 相手が話したくなるような聞き方
+
+応答:`;
+    }
+    
+    if (questionType === 2) {
+        return `
+これまでの話から、体験の深い部分を自然に聞き出してください：
+現在の話: 「${currentMessage}」
+感情状態: ${emotionAnalysis.type}
+
+${baseRules}
+- 感情を直接聞かず、体験や状況から感情が伝わるような質問
+- 「どう感じましたか？」より「その時の状況は？」「印象的だったのは？」
+- ${emotionAnalysis.type}な状態に寄り添った聞き方
+
+応答:`;
+    }
+    
+    // 話題の展開または締めくくり
+    const cycleCount = Math.floor((messageCount - 1) / 3) + 1;
+    if (cycleCount >= 3) {
+        return `
+十分な対話ができました。自然に日記作成を提案してください：
+これまでの会話: ${session.messages.slice(-6).map(msg => msg.content).join(' ')}
+
+${baseRules}
+- 聞かせてもらったことへの感謝を表現
+- 相手の体験を肯定的に受け止める言葉
+- 日記作成への自然で前向きな提案
+
+応答:`;
+    } else {
+        return `
+現在の話題から自然に話を広げてください：
+現在の内容: 「${currentMessage}」
+会話の雰囲気: ${emotionAnalysis.type}
+
+${baseRules}
+- 急に話題を変えるのではなく、今の話から関連する内容を聞く
+- 相手が無理なく答えられる範囲での質問
+- 自然な会話の流れを保つ
+
+応答:`;
+    }
+}
+
+// デモモード用の適応的応答生成
+function generateDemoResponses(messageCount, emotionAnalysis) {
+    const responsesByEmotion = {
+        positive: [
+            "それは素晴らしいですね！どんな瞬間が一番印象的でしたか？",
+            "いい体験でしたね。周りの反応はいかがでしたか？",
+            "楽しそうな雰囲気が伝わってきます。他にも何か心に残ったことはありますか？",
+            "今日は本当に充実した一日だったんですね。この素敵な思い出を日記にまとめてみませんか？"
+        ],
+        negative: [
+            "お疲れ様でした。大変だったんですね。",
+            "そういう時もありますよね。どんな風に乗り越えられましたか？",
+            "辛い状況だったと思います。他に何かサポートはありましたか？",
+            "いろいろなことがあった一日だったんですね。お話を聞かせていただき、ありがとうございました。日記にまとめてみませんか？"
+        ],
+        neutral: [
+            "そうだったんですね。その時はどんな感じでしたか？",
+            "なるほど。一番印象に残ったのはどの部分ですか？",
+            "日常の中にも色々なことがありますね。他にも何かありましたか？",
+            "お話を聞かせていただき、ありがとうございました。今日の一日を日記にまとめてみませんか？"
+        ]
+    };
+    
+    return responsesByEmotion[emotionAnalysis.type] || responsesByEmotion.neutral;
+}
+
+// タイトル生成エンドポイント
 app.post('/api/generate-title', async (req, res) => {
     try {
         const { content } = req.body;
@@ -590,7 +667,7 @@ ${session.messages.map(msg => `${msg.role === 'user' ? 'ユーザー' : 'AI'}: $
                 throw apiError;
             }
         } else {
-            // デモモード（改善版）
+            // デモモード
             const conversationText = userMessages.map(msg => msg.content).join(' ');
             const summaryDiary = `今日は心温まる一日を過ごすことができました。${conversationText.substring(0, 50)}...について振り返りながら、改めて日々の大切さを感じました。
 
